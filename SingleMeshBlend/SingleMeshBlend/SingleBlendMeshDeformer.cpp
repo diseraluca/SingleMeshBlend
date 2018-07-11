@@ -11,6 +11,10 @@
 
 #include "SingleBlendMeshDeformer.h"
 
+#include <maya/MFnTypedAttribute.h>
+#include <maya/MFnNumericAttribute.h>
+#include <maya/MGlobal.h>
+
 MString SingleBlendMeshDeformer::typeName{ "SingleBlendMesh" };
 MTypeId SingleBlendMeshDeformer::typeId{ 0x0d12309 };
 
@@ -24,7 +28,28 @@ void * SingleBlendMeshDeformer::creator()
 
 MStatus SingleBlendMeshDeformer::initialize()
 {
-	return MStatus();
+	MStatus status{};
+
+	MFnTypedAttribute   tAttr{};
+	MFnNumericAttribute nAttr{};
+
+	blendMesh = tAttr.create("blendMesh", "blm", MFnData::kMesh, &status);
+	CHECK_MSTATUS_AND_RETURN_IT(status);
+	CHECK_MSTATUS(addAttribute(blendMesh));
+
+	blendWeight = nAttr.create("blendWeight", "blw", MFnNumericData::kDouble, 0.0, &status);
+	CHECK_MSTATUS_AND_RETURN_IT(status);
+	CHECK_MSTATUS(nAttr.setKeyable(true));
+	CHECK_MSTATUS(nAttr.setMin(0.0));
+	CHECK_MSTATUS(nAttr.setMax(1.0));
+	CHECK_MSTATUS(addAttribute(blendWeight));
+
+	attributeAffects(blendMesh, outputGeom);
+	attributeAffects(blendWeight, outputGeom);
+
+	MGlobal::executeCommand("makePaintable -attrType multiFloat -sm deformer SingleBlendMesh weights");
+
+	return MStatus::kSuccess;
 }
 
 MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterator, const MMatrix & matrix, unsigned int multiIndex)
