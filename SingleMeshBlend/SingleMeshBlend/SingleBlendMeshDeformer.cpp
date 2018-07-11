@@ -14,7 +14,6 @@
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MGlobal.h>
-#include <maya/MFnMesh.h>
 #include <maya/MItGeometry.h>
 
 MString SingleBlendMeshDeformer::typeName{ "SingleBlendMesh" };
@@ -22,6 +21,12 @@ MTypeId SingleBlendMeshDeformer::typeId{ 0x0d12309 };
 
 MObject SingleBlendMeshDeformer::blendMesh;
 MObject SingleBlendMeshDeformer::blendWeight;
+
+SingleBlendMeshDeformer::SingleBlendMeshDeformer()
+	:isInitialized{ false },
+	 blendVertexPositions{}
+{
+}
 
 void * SingleBlendMeshDeformer::creator()
 {
@@ -67,19 +72,39 @@ MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterat
 	double blendWeightValue{ block.inputValue(blendWeight).asDouble() };
 
 	MFnMesh blendMeshFn{ blendMeshValue };
+	if (!isInitialized) {
+		CHECK_MSTATUS_AND_RETURN_IT( cacheBlendMeshVertexPositions(blendMeshFn) );
+		isInitialized = true;
+	}
 
-	for (iterator.reset(); !iterator.isDone(); iterator.next()) {
-		MPoint currentPosition{ iterator.position()};
+	MPointArray vertexPositions{};
+	CHECK_MSTATUS_AND_RETURN_IT( iterator.allPositions(vertexPositions) );
+	unsigned int vertexCount{ vertexPositions.length() };
 
-		MPoint targetPosition{};
-		CHECK_MSTATUS_AND_RETURN_IT( blendMeshFn.getPoint(iterator.index(), targetPosition) );
+	MPoint targetPosition{};
+	for (unsigned int vertexIndex{ 0 }; vertexIndex < vertexCount; vertexIndex++) {
+		CHECK_MSTATUS_AND_RETURN_IT( blendMeshFn.getPoint(vertexIndex, targetPosition) );
 
-		float weight{ weightValue(block, multiIndex, iterator.index()) };
-		MVector delta{ (targetPosition - currentPosition) * blendWeightValue * envelopeValue *  weight };
-		MPoint newPosition{ delta + currentPosition };
+		float weight{ weightValue(block, multiIndex, vertexIndex) };
+		MVector delta{ (targetPosition - vertexPositions[vertexIndex]) * blendWeightValue * envelopeValue *  weight };
+		MPoint newPosition{ delta + vertexPositions[vertexIndex] };
 
-		iterator.setPosition(newPosition);
+		vertexPositions[vertexIndex] = newPosition;
 	}
 	
+	iterator.setAllPositions(vertexPositions);
+	return MStatus::kSuccess;
+}
+
+MStatus SingleBlendMeshDeformer::cacheBlendMeshVertexPositions(const MFnMesh & blendMeshFn)
+{
+	MStatus status{};
+
+	int vertexCount{ blendMeshFn.numVertices(&status) };
+	CHECK_MSTATUS_AND_RETURN_IT(status);
+
+	blendVertexPositions.setLength(vertexCount);
+	CHECK_MSTATUS_AND_RETURN_IT( blendMeshFn.getPoints(blendVertexPositions) );
+
 	return MStatus::kSuccess;
 }

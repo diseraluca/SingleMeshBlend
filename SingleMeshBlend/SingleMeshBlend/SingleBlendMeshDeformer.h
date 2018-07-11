@@ -16,12 +16,20 @@
 #pragma once
 
 #include <maya/MPxDeformerNode.h>
+#include <maya/MPointArray.h>
+#include <maya/MFnMesh.h>
 
 class SingleBlendMeshDeformer : public MPxDeformerNode {
 public:
+	SingleBlendMeshDeformer();
+
 	static void* creator();
 	static MStatus initialize();
 	virtual MStatus deform(MDataBlock & block, MItGeometry & iterator, const MMatrix & matrix, unsigned int multiIndex) override;
+
+private:
+	/// Caches the blendMesh positions into this->blendVertexPositions
+	MStatus cacheBlendMeshVertexPositions(const MFnMesh& blendMeshFn);
 
 public:
 	static MString typeName;
@@ -29,4 +37,8 @@ public:
 	
 	static MObject blendMesh;
 	static MObject blendWeight;
+
+private:
+	bool isInitialized;
+	MPointArray blendVertexPositions;
 };
