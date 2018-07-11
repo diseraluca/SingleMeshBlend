@@ -79,14 +79,11 @@ MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterat
 
 	MPointArray vertexPositions{};
 	CHECK_MSTATUS_AND_RETURN_IT( iterator.allPositions(vertexPositions) );
+	
 	unsigned int vertexCount{ vertexPositions.length() };
-
-	MPoint targetPosition{};
 	for (unsigned int vertexIndex{ 0 }; vertexIndex < vertexCount; vertexIndex++) {
-		CHECK_MSTATUS_AND_RETURN_IT( blendMeshFn.getPoint(vertexIndex, targetPosition) );
-
 		float weight{ weightValue(block, multiIndex, vertexIndex) };
-		MVector delta{ (targetPosition - vertexPositions[vertexIndex]) * blendWeightValue * envelopeValue *  weight };
+		MVector delta{ (blendVertexPositions[vertexIndex] - vertexPositions[vertexIndex]) * blendWeightValue * envelopeValue *  weight };
 		MPoint newPosition{ delta + vertexPositions[vertexIndex] };
 
 		vertexPositions[vertexIndex] = newPosition;
