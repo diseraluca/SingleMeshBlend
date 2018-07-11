@@ -20,6 +20,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pluginMain.cpp" />
+    <ClCompile Include="SingleBlendMeshDeformer.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="SingleBlendMeshDeformer.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
