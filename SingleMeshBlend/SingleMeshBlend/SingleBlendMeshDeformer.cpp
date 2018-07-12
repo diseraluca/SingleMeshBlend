@@ -16,17 +16,25 @@
 #include <maya/MGlobal.h>
 #include <maya/MItGeometry.h>
 #include <maya/MEvaluationNode.h>
+#include <maya/MThreadPool.h>
 
 MString SingleBlendMeshDeformer::typeName{ "SingleBlendMesh" };
 MTypeId SingleBlendMeshDeformer::typeId{ 0x0d12309 };
 
 MObject SingleBlendMeshDeformer::blendMesh;
 MObject SingleBlendMeshDeformer::blendWeight;
+MObject SingleBlendMeshDeformer::numTasks;
 
 SingleBlendMeshDeformer::SingleBlendMeshDeformer()
 	:isInitialized{ false },
 	 blendVertexPositions{}
 {
+	MThreadPool::init();
+}
+
+SingleBlendMeshDeformer::~SingleBlendMeshDeformer()
+{
+	MThreadPool::release();
 }
 
 void * SingleBlendMeshDeformer::creator()
@@ -51,6 +59,12 @@ MStatus SingleBlendMeshDeformer::initialize()
 	CHECK_MSTATUS(nAttr.setMin(0.0));
 	CHECK_MSTATUS(nAttr.setMax(1.0));
 	CHECK_MSTATUS(addAttribute(blendWeight));
+
+	numTasks = nAttr.create("numTasks", "ntk", MFnNumericData::kInt, 32, &status);
+	CHECK_MSTATUS_AND_RETURN_IT(status);
+	CHECK_MSTATUS(nAttr.setChannelBox(true));
+	CHECK_MSTATUS(nAttr.setMin(1));
+	CHECK_MSTATUS(addAttribute(numTasks));
 
 	attributeAffects(blendMesh, outputGeom);
 	attributeAffects(blendWeight, outputGeom);
@@ -111,6 +125,20 @@ MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterat
 	
 	iterator.setAllPositions(vertexPositions);
 	return MStatus::kSuccess;
+}
+
+ThreadData * SingleBlendMeshDeformer::createThreadData(int numTasks, TaskData * pTaskData)
+{
+	return nullptr;
+}
+
+void SingleBlendMeshDeformer::createTasks(void * data, MThreadRootTask * pRoot)
+{
+}
+
+MThreadRetVal SingleBlendMeshDeformer::threadEvaluate(void * pParam)
+{
+	return MThreadRetVal();
 }
 
 MStatus SingleBlendMeshDeformer::cacheBlendMeshVertexPositions(const MFnMesh & blendMeshFn)

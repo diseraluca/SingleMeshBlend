@@ -19,14 +19,39 @@
 #include <maya/MPointArray.h>
 #include <maya/MFnMesh.h>
 
+//An helper struct that store the data needed by the threads.
+//The data is shared to all threads
+struct TaskData {
+	MPointArray vertexPositions;
+	MPointArray blendVertexPositions;
+
+	float envelopeValue;
+	double blendWeightValue;
+	float weight;
+};
+
+//An helper struct that store the information needed
+//for a specific thread computation
+struct ThreadData {
+	unsigned int start;
+	unsigned int end;
+	unsigned int numTasks;
+	TaskData* pData;
+};
+
 class SingleBlendMeshDeformer : public MPxDeformerNode {
 public:
 	SingleBlendMeshDeformer();
+	~SingleBlendMeshDeformer();
 
 	static  void*   creator();
 	static  MStatus initialize();
 	virtual MStatus preEvaluation(const  MDGContext& context, const MEvaluationNode& evaluationNode) override;
 	virtual MStatus deform(MDataBlock & block, MItGeometry & iterator, const MMatrix & matrix, unsigned int multiIndex) override;
+
+	ThreadData*         createThreadData(int numTasks, TaskData* pTaskData);
+	static void         createTasks(void* data, MThreadRootTask *pRoot);
+	static MThreadRetVal threadEvaluate(void* pParam);
 
 private:
 	/// Caches the blendMesh positions into this->blendVertexPositions
@@ -38,6 +63,9 @@ public:
 	
 	static MObject blendMesh;
 	static MObject blendWeight;
+
+	/// The number of thread tasks
+	static MObject numTasks;
 
 private:
 	bool isInitialized;
