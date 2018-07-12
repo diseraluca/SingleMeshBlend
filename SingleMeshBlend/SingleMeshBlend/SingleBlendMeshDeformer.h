@@ -18,6 +18,7 @@
 #include <maya/MPxDeformerNode.h>
 #include <maya/MPointArray.h>
 #include <maya/MFnMesh.h>
+#include <maya/MThreadPool.h>
 
 //An helper struct that store the data needed by the threads.
 //The data is shared to all threads
@@ -68,5 +69,6 @@ public:
 
 private:
 	bool isInitialized;
-	MPointArray blendVertexPositions;
+
+	TaskData taskData;
 };
