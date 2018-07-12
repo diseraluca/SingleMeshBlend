@@ -23,8 +23,9 @@ class SingleBlendMeshDeformer : public MPxDeformerNode {
 public:
 	SingleBlendMeshDeformer();
 
-	static void* creator();
-	static MStatus initialize();
+	static  void*   creator();
+	static  MStatus initialize();
+	virtual MStatus preEvaluation(const  MDGContext& context, const MEvaluationNode& evaluationNode) override;
 	virtual MStatus deform(MDataBlock & block, MItGeometry & iterator, const MMatrix & matrix, unsigned int multiIndex) override;
 
 private:

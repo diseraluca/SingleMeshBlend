@@ -15,6 +15,7 @@
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MGlobal.h>
 #include <maya/MItGeometry.h>
+#include <maya/MEvaluationNode.h>
 
 MString SingleBlendMeshDeformer::typeName{ "SingleBlendMesh" };
 MTypeId SingleBlendMeshDeformer::typeId{ 0x0d12309 };
@@ -55,6 +56,21 @@ MStatus SingleBlendMeshDeformer::initialize()
 	attributeAffects(blendWeight, outputGeom);
 
 	MGlobal::executeCommand("makePaintable -attrType multiFloat -sm deformer SingleBlendMesh weights");
+
+	return MStatus::kSuccess;
+}
+
+MStatus SingleBlendMeshDeformer::preEvaluation(const  MDGContext& context, const MEvaluationNode& evaluationNode) {
+	MStatus status{};
+
+	if (!context.isNormal()) {
+		return MStatus::kFailure;
+	}
+
+	// If the blendMesh has been changed we set isInitiliazed to false to cache it again
+	if (evaluationNode.dirtyPlugExists(blendMesh, &status) && status) {
+		isInitialized = false;
+	}
 
 	return MStatus::kSuccess;
 }
