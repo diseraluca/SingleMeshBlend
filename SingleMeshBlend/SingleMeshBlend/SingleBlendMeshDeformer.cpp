@@ -108,6 +108,10 @@ MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterat
 
 	CHECK_MSTATUS_AND_RETURN_IT( iterator.allPositions(taskData.vertexPositions) );
 
+	// Setting the relevant attribute values on taskData so that the threads can access them
+	taskData.envelopeValue = envelopeValue;
+	taskData.blendWeightValue = blendWeightValue;
+
 	// Initialize thead data
 	int numTasksValue{ block.inputValue(numTasks).asInt() };
 	ThreadData* threadData{ createThreadData(numTasksValue, &taskData) };
