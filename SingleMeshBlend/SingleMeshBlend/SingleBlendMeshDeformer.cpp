@@ -96,13 +96,17 @@ MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterat
 	MPointArray vertexPositions{};
 	CHECK_MSTATUS_AND_RETURN_IT( iterator.allPositions(vertexPositions) );
 	
+	//MPointArray operator[] has a non-negligible overhead. 
+	//Accessing the memory directly with pointers bypass that overhead.
 	unsigned int vertexCount{ vertexPositions.length() };
+	MPoint* currentVertexPosition{ &vertexPositions[0] };
+	MPoint* blendVertexPosition{ &blendVertexPositions[0] };
 	for (unsigned int vertexIndex{ 0 }; vertexIndex < vertexCount; vertexIndex++) {
 		float weight{ weightValue(block, multiIndex, vertexIndex) };
-		MVector delta{ (blendVertexPositions[vertexIndex] - vertexPositions[vertexIndex]) * blendWeightValue * envelopeValue *  weight };
-		MPoint newPosition{ delta + vertexPositions[vertexIndex] };
+		MVector delta{ (*(blendVertexPosition + vertexIndex) - *(currentVertexPosition + vertexIndex)) * blendWeightValue * envelopeValue *  weight };
+		MPoint newPosition{ delta + *(currentVertexPosition + vertexIndex) };
 
-		vertexPositions[vertexIndex] = newPosition;
+		*(currentVertexPosition + vertexIndex) = newPosition;
 	}
 	
 	iterator.setAllPositions(vertexPositions);
