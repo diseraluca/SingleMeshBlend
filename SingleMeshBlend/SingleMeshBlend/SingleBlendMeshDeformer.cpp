@@ -127,17 +127,72 @@ MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterat
 	return MStatus::kSuccess;
 }
 
-ThreadData * SingleBlendMeshDeformer::createThreadData(int numTasks, TaskData * pTaskData)
+ThreadData * SingleBlendMeshDeformer::createThreadData(int numTasks, TaskData * taskData)
 {
-	return nullptr;
+	ThreadData* threadData = new ThreadData[numTasks];
+	unsigned int vertexCount{ taskData->vertexPositions.length() };
+	unsigned int taskLenght{ (vertexCount + numTasks - 1) / numTasks };
+
+	unsigned int start{ 0 };
+	unsigned int end{ taskLenght };
+
+	int lastTask{ numTasks - 1 };
+	for (int taskIndex{ 0 }; taskIndex < numTasks; taskIndex++) {
+		if (taskIndex == lastTask) {
+			end = vertexCount;
+		}
+
+		threadData[taskIndex].start = start;
+		threadData[taskIndex].end = end;
+		threadData[taskIndex].numTasks = numTasks;
+		threadData[taskIndex].data = taskData;
+
+		start += taskLenght;
+		end += taskLenght;
+	}
+
+	return threadData;
 }
 
 void SingleBlendMeshDeformer::createTasks(void * data, MThreadRootTask * pRoot)
 {
+	ThreadData* threadData{ static_cast<ThreadData*>(data) };
+
+	if (threadData) {
+		int numTasks{ threadData->numTasks };
+		for (int taskIndex{ 0 }; taskIndex < numTasks; taskIndex++) {
+			MThreadPool::createTask(threadEvaluate, (void*)&threadData[taskIndex], pRoot);
+		}
+		MThreadPool::executeAndJoin(pRoot);
+	}
 }
 
 MThreadRetVal SingleBlendMeshDeformer::threadEvaluate(void * pParam)
 {
+	MStatus status{};
+
+	ThreadData* threadData{ (ThreadData*)pParam };
+	TaskData* data{ threadData->data };
+
+	unsigned int start{ threadData->start };
+	unsigned int end{ threadData->end };
+
+	MPointArray& vertexPositions{ data->vertexPositions };
+	MPointArray& blendVertexPositions{ data->blendVertexPositions };
+
+	float envelopeValue{ data->envelopeValue };
+	double blendWeightValue{ data->blendWeightValue };
+
+	unsigned int vertexCount{ vertexPositions.length() };
+	MPoint* currentVertexPosition{ &vertexPositions[0] };
+	MPoint* blendVertexPosition{ &blendVertexPositions[0] };
+	for (unsigned int vertexIndex{ start }; vertexIndex < end; vertexIndex++) {
+		MVector delta{ (*(blendVertexPosition + vertexIndex) - *(currentVertexPosition + vertexIndex)) * blendWeightValue * envelopeValue };
+		MPoint newPosition{ delta + *(currentVertexPosition + vertexIndex) };
+
+		*(currentVertexPosition + vertexIndex) = newPosition;
+	}
+
 	return MThreadRetVal();
 }
 

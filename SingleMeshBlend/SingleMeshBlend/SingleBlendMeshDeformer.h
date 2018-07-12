@@ -27,7 +27,6 @@ struct TaskData {
 
 	float envelopeValue;
 	double blendWeightValue;
-	float weight;
 };
 
 //An helper struct that store the information needed
@@ -36,7 +35,7 @@ struct ThreadData {
 	unsigned int start;
 	unsigned int end;
 	unsigned int numTasks;
-	TaskData* pData;
+	TaskData* data;
 };
 
 class SingleBlendMeshDeformer : public MPxDeformerNode {
@@ -49,7 +48,7 @@ public:
 	virtual MStatus preEvaluation(const  MDGContext& context, const MEvaluationNode& evaluationNode) override;
 	virtual MStatus deform(MDataBlock & block, MItGeometry & iterator, const MMatrix & matrix, unsigned int multiIndex) override;
 
-	ThreadData*         createThreadData(int numTasks, TaskData* pTaskData);
+	ThreadData*         createThreadData(int numTasks, TaskData* taskData);
 	static void         createTasks(void* data, MThreadRootTask *pRoot);
 	static MThreadRetVal threadEvaluate(void* pParam);
 
