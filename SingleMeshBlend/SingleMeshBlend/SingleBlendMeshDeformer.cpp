@@ -97,22 +97,25 @@ MStatus SingleBlendMeshDeformer::preEvaluation(const  MDGContext& context, const
 
 MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterator, const MMatrix & matrix, unsigned int multiIndex)
 {
-	MPlug blendMeshPlug{ thisMObject(), blendMesh };
-	if (!blendMeshPlug.isConnected()) {
-		MGlobal::displayWarning(this->name() + ": blendMesh not connected. Please connect a mesh.");
-		return MStatus::kInvalidParameter;
-	}
-
-	float envelopeValue{ block.inputValue(envelope).asFloat() };
-	MObject blendMeshValue{ block.inputValue(blendMesh).asMesh() };
-	double blendWeightValue{ block.inputValue(blendWeight).asDouble() };
 	bool rebindValue{ block.inputValue(rebind).asBool() };
 
-	MFnMesh blendMeshFn{ blendMeshValue };
 	if (!isInitialized || rebindValue) {
+		// If blendMesh is not connected we get out
+		MPlug blendMeshPlug{ thisMObject(), blendMesh };
+		if (!blendMeshPlug.isConnected()) {
+			MGlobal::displayWarning(this->name() + ": blendMesh not connected. Please connect a mesh.");
+			return MStatus::kInvalidParameter;
+		}
+
+		MObject blendMeshValue{ block.inputValue(blendMesh).asMesh() };
+		MFnMesh blendMeshFn{ blendMeshValue };
+
 		CHECK_MSTATUS_AND_RETURN_IT( cacheBlendMeshVertexPositions(blendMeshFn) );
 		isInitialized = true;
 	}
+
+	float envelopeValue{ block.inputValue(envelope).asFloat() };
+	double blendWeightValue{ block.inputValue(blendWeight).asDouble() };
 
 	CHECK_MSTATUS_AND_RETURN_IT( iterator.allPositions(taskData.vertexPositions) );
 
