@@ -123,6 +123,7 @@ MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterat
 
 		CHECK_MSTATUS_AND_RETURN_IT( cacheBlendMeshVertexPositions(blendMeshFn) );
 		isInitialized = true;
+		isThreadDataInitialized = false;
 	}
 
 	float envelopeValue{ block.inputValue(envelope).asFloat() };
