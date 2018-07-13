@@ -63,6 +63,7 @@ public:
 	
 	static MObject blendMesh;
 	static MObject blendWeight;
+	static MObject rebind;
 
 	/// The number of thread tasks
 	static MObject numTasks;

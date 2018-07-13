@@ -22,6 +22,7 @@ MTypeId SingleBlendMeshDeformer::typeId{ 0x0d12309 };
 
 MObject SingleBlendMeshDeformer::blendMesh;
 MObject SingleBlendMeshDeformer::blendWeight;
+MObject SingleBlendMeshDeformer::rebind;
 MObject SingleBlendMeshDeformer::numTasks;
 
 SingleBlendMeshDeformer::SingleBlendMeshDeformer()
@@ -59,14 +60,20 @@ MStatus SingleBlendMeshDeformer::initialize()
 	CHECK_MSTATUS(nAttr.setMax(1.0));
 	CHECK_MSTATUS(addAttribute(blendWeight));
 
+	rebind = nAttr.create("rebind", "rbd", MFnNumericData::kBoolean, false, &status);
+	CHECK_MSTATUS_AND_RETURN_IT(status);
+	CHECK_MSTATUS(nAttr.setKeyable(true));
+	CHECK_MSTATUS(addAttribute(rebind));
+
 	numTasks = nAttr.create("numTasks", "ntk", MFnNumericData::kInt, 32, &status);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 	CHECK_MSTATUS(nAttr.setChannelBox(true));
 	CHECK_MSTATUS(nAttr.setMin(1));
 	CHECK_MSTATUS(addAttribute(numTasks));
 
-	attributeAffects(blendMesh, outputGeom);
-	attributeAffects(blendWeight, outputGeom);
+	CHECK_MSTATUS(attributeAffects(blendMesh, outputGeom));
+	CHECK_MSTATUS(attributeAffects(blendWeight, outputGeom));
+	CHECK_MSTATUS(attributeAffects(rebind, outputGeom));
 
 	MGlobal::executeCommand("makePaintable -attrType multiFloat -sm deformer SingleBlendMesh weights");
 
@@ -90,21 +97,25 @@ MStatus SingleBlendMeshDeformer::preEvaluation(const  MDGContext& context, const
 
 MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterator, const MMatrix & matrix, unsigned int multiIndex)
 {
-	MPlug blendMeshPlug{ thisMObject(), blendMesh };
-	if (!blendMeshPlug.isConnected()) {
-		MGlobal::displayWarning(this->name() + ": blendMesh not connected. Please connect a mesh.");
-		return MStatus::kInvalidParameter;
-	}
+	bool rebindValue{ block.inputValue(rebind).asBool() };
 
-	float envelopeValue{ block.inputValue(envelope).asFloat() };
-	MObject blendMeshValue{ block.inputValue(blendMesh).asMesh() };
-	double blendWeightValue{ block.inputValue(blendWeight).asDouble() };
+	if (!isInitialized || rebindValue) {
+		// If blendMesh is not connected we get out
+		MPlug blendMeshPlug{ thisMObject(), blendMesh };
+		if (!blendMeshPlug.isConnected()) {
+			MGlobal::displayWarning(this->name() + ": blendMesh not connected. Please connect a mesh.");
+			return MStatus::kInvalidParameter;
+		}
 
-	MFnMesh blendMeshFn{ blendMeshValue };
-	if (!isInitialized) {
+		MObject blendMeshValue{ block.inputValue(blendMesh).asMesh() };
+		MFnMesh blendMeshFn{ blendMeshValue };
+
 		CHECK_MSTATUS_AND_RETURN_IT( cacheBlendMeshVertexPositions(blendMeshFn) );
 		isInitialized = true;
 	}
+
+	float envelopeValue{ block.inputValue(envelope).asFloat() };
+	double blendWeightValue{ block.inputValue(blendWeight).asDouble() };
 
 	CHECK_MSTATUS_AND_RETURN_IT( iterator.allPositions(taskData.vertexPositions) );
 
