@@ -164,11 +164,7 @@ ThreadData * SingleBlendMeshDeformer::createThreadData(int numTasks, TaskData * 
 	unsigned int start{ 0 };
 	unsigned int end{ taskLenght };
 
-	int lastTask{ numTasks - 1 };
-	for (int taskIndex{ 0 }; taskIndex < numTasks; taskIndex++) {
-		if (taskIndex == lastTask) {
-			end = vertexCount;
-		}
+	for (int taskIndex{ 0 }; taskIndex < numTasks; ++taskIndex) {
 
 		threadData[taskIndex].start = start;
 		threadData[taskIndex].end = end;
@@ -178,6 +174,9 @@ ThreadData * SingleBlendMeshDeformer::createThreadData(int numTasks, TaskData * 
 		start += taskLenght;
 		end += taskLenght;
 	}
+
+	// We patch the last task to end at the last vertex
+	threadData[numTasks - 1].end = vertexCount;
 
 	return threadData;
 }
