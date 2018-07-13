@@ -27,13 +27,17 @@ MObject SingleBlendMeshDeformer::numTasks;
 
 SingleBlendMeshDeformer::SingleBlendMeshDeformer()
 	:isInitialized{ false },
-     taskData{}
+	 isThreadDataInitialized{ false },
+	 lastTaskValue{ 0 },
+     taskData{},
+	 threadData{ nullptr }
 {
 	MThreadPool::init();
 }
 
 SingleBlendMeshDeformer::~SingleBlendMeshDeformer()
 {
+	delete[] threadData;
 	MThreadPool::release();
 }
 
@@ -80,6 +84,7 @@ MStatus SingleBlendMeshDeformer::initialize()
 	return MStatus::kSuccess;
 }
 
+/*
 MStatus SingleBlendMeshDeformer::preEvaluation(const  MDGContext& context, const MEvaluationNode& evaluationNode) {
 	MStatus status{};
 
@@ -92,8 +97,14 @@ MStatus SingleBlendMeshDeformer::preEvaluation(const  MDGContext& context, const
 		isInitialized = false;
 	}
 
+	// If numTask was changed we have to create the ThreadData again
+	if (evaluationNode.dirtyPlugExists(blendMesh, &status) && status) {
+		isThreadDataInitialized = false;
+	}
+
 	return MStatus::kSuccess;
 }
+*/
 
 MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterator, const MMatrix & matrix, unsigned int multiIndex)
 {
@@ -125,12 +136,20 @@ MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterat
 
 	// Initialize thead data
 	int numTasksValue{ block.inputValue(numTasks).asInt() };
-	ThreadData* threadData{ createThreadData(numTasksValue, &taskData) };
+	if (!isThreadDataInitialized || ( lastTaskValue != numTasksValue )) {
+		//If it isn't the first time we create the data we delete the previous data
+		if (threadData) {
+			delete[] threadData;
+		}
+
+		threadData = createThreadData(numTasksValue, &taskData);
+		isThreadDataInitialized = true;
+		lastTaskValue = numTasksValue;
+	}
 
 	MThreadPool::newParallelRegion(createTasks, (void*)threadData);
 
 	iterator.setAllPositions(taskData.vertexPositions);
-	delete[] threadData;
 
 	return MStatus::kSuccess;
 }

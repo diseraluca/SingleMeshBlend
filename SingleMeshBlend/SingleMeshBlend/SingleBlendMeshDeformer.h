@@ -46,7 +46,7 @@ public:
 
 	static  void*   creator();
 	static  MStatus initialize();
-	virtual MStatus preEvaluation(const  MDGContext& context, const MEvaluationNode& evaluationNode) override;
+	//virtual MStatus preEvaluation(const  MDGContext& context, const MEvaluationNode& evaluationNode) override;
 	virtual MStatus deform(MDataBlock & block, MItGeometry & iterator, const MMatrix & matrix, unsigned int multiIndex) override;
 
 	ThreadData*         createThreadData(int numTasks, TaskData* taskData);
@@ -70,6 +70,11 @@ public:
 
 private:
 	bool isInitialized;
+	bool isThreadDataInitialized;
+
+	//The last number of tasks. If it is different to the current numTask we recreate the threadData
+	int lastTaskValue;
 
 	TaskData taskData;
+	ThreadData* threadData;
 };
