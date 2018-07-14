@@ -69,7 +69,8 @@ MStatus SingleBlendMeshDeformer::initialize()
 	CHECK_MSTATUS(nAttr.setKeyable(true));
 	CHECK_MSTATUS(addAttribute(rebind));
 
-	vertsPerTask = nAttr.create("vertsPerTask", "vpt", MFnNumericData::kInt, 2000, &status);
+	// By testing with different meshes 10000 seemed to give the best all-around result
+	vertsPerTask = nAttr.create("vertsPerTask", "vpt", MFnNumericData::kInt, 10000, &status);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 	CHECK_MSTATUS(nAttr.setChannelBox(true));
 	CHECK_MSTATUS(nAttr.setMin(1));
