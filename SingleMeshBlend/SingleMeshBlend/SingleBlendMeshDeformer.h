@@ -24,7 +24,7 @@
 //The data is shared to all threads
 struct TaskData {
 	MPointArray vertexPositions;
-	MPointArray blendVertexPositions;
+	MVectorArray deltas;
 
 	float envelopeValue;
 	double blendWeightValue;
@@ -55,7 +55,11 @@ public:
 
 private:
 	/// Caches the blendMesh positions into this->blendVertexPositions
-	MStatus cacheBlendMeshVertexPositions(const MFnMesh& blendMeshFn);
+	MStatus cacheBlendMeshVertexPositionsAndDeltas(const MFnMesh& blendMeshFn, const MPointArray& vertexPositions);
+
+	/// Caches the deltas between the mesh and the blend mesh
+	/// Warning: By caching the deltas the base mesh is expected to be non animated
+	MStatus cacheDeltasValues(const MPointArray& vertexPositions, const MPointArray& blendVertexPositions, int vertexCount);
 
 public:
 	static MString typeName;
