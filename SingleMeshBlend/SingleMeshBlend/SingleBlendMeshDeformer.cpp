@@ -31,8 +31,6 @@ SingleBlendMeshDeformer::SingleBlendMeshDeformer()
 	lastTaskValue{ 0 },
 	taskData{},
 	threadData{ nullptr },
-	counter{ 0 },
-	time{}
 {
 	MThreadPool::init();
 }
