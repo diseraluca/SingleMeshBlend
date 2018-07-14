@@ -23,7 +23,7 @@ MTypeId SingleBlendMeshDeformer::typeId{ 0x0d12309 };
 MObject SingleBlendMeshDeformer::blendMesh;
 MObject SingleBlendMeshDeformer::blendWeight;
 MObject SingleBlendMeshDeformer::rebind;
-MObject SingleBlendMeshDeformer::numTasks;
+MObject SingleBlendMeshDeformer::vertsPerTask;
 
 SingleBlendMeshDeformer::SingleBlendMeshDeformer()
 	:isInitialized{ false },
@@ -69,11 +69,11 @@ MStatus SingleBlendMeshDeformer::initialize()
 	CHECK_MSTATUS(nAttr.setKeyable(true));
 	CHECK_MSTATUS(addAttribute(rebind));
 
-	numTasks = nAttr.create("numTasks", "ntk", MFnNumericData::kInt, 32, &status);
+	vertsPerTask = nAttr.create("vertsPerTask", "vpt", MFnNumericData::kInt, 2000, &status);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 	CHECK_MSTATUS(nAttr.setChannelBox(true));
 	CHECK_MSTATUS(nAttr.setMin(1));
-	CHECK_MSTATUS(addAttribute(numTasks));
+	CHECK_MSTATUS(addAttribute(vertsPerTask));
 
 	CHECK_MSTATUS(attributeAffects(blendMesh, outputGeom));
 	CHECK_MSTATUS(attributeAffects(blendWeight, outputGeom));
@@ -84,27 +84,6 @@ MStatus SingleBlendMeshDeformer::initialize()
 	return MStatus::kSuccess;
 }
 
-/*
-MStatus SingleBlendMeshDeformer::preEvaluation(const  MDGContext& context, const MEvaluationNode& evaluationNode) {
-	MStatus status{};
-
-	if (!context.isNormal()) {
-		return MStatus::kFailure;
-	}
-
-	// If the blendMesh has been changed we set isInitiliazed to false to cache it again
-	if (evaluationNode.dirtyPlugExists(blendMesh, &status) && status) {
-		isInitialized = false;
-	}
-
-	// If numTask was changed we have to create the ThreadData again
-	if (evaluationNode.dirtyPlugExists(blendMesh, &status) && status) {
-		isThreadDataInitialized = false;
-	}
-
-	return MStatus::kSuccess;
-}
-*/
 
 MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterator, const MMatrix & matrix, unsigned int multiIndex)
 {
@@ -136,16 +115,16 @@ MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterat
 	taskData.blendWeightValue = blendWeightValue;
 
 	// Initialize thead data
-	int numTasksValue{ block.inputValue(numTasks).asInt() };
-	if (!isThreadDataInitialized || ( lastTaskValue != numTasksValue )) {
+	int vertsPerTaskValue{ block.inputValue(vertsPerTask).asInt() };
+	if (!isThreadDataInitialized || ( lastTaskValue != vertsPerTaskValue )) {
 		//If it isn't the first time we create the data we delete the previous data
 		if (threadData) {
 			delete[] threadData;
 		}
 
-		threadData = createThreadData(numTasksValue, &taskData);
+		threadData = createThreadData(vertsPerTaskValue, &taskData);
 		isThreadDataInitialized = true;
-		lastTaskValue = numTasksValue;
+		lastTaskValue = vertsPerTaskValue;
 	}
 
 	MThreadPool::newParallelRegion(createTasks, (void*)threadData);
@@ -155,24 +134,25 @@ MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterat
 	return MStatus::kSuccess;
 }
 
-ThreadData * SingleBlendMeshDeformer::createThreadData(int numTasks, TaskData * taskData)
+ThreadData * SingleBlendMeshDeformer::createThreadData(int vertsPerTask, TaskData * taskData)
 {
-	ThreadData* threadData = new ThreadData[numTasks];
+	// Calculate the number of task needed and allocate the required memory
 	unsigned int vertexCount{ taskData->vertexPositions.length() };
-	unsigned int taskLenght{ (vertexCount + numTasks - 1) / numTasks };
-
+	unsigned int numTasks = (vertexCount < vertsPerTask) ? 1 : ( vertexCount / vertsPerTask );
+	ThreadData* threadData = new ThreadData[numTasks];
+	
 	unsigned int start{ 0 };
-	unsigned int end{ taskLenght };
+	unsigned int end{ (unsigned int)vertsPerTask };
 
-	for (int taskIndex{ 0 }; taskIndex < numTasks; ++taskIndex) {
+	for (unsigned int taskIndex{ 0 }; taskIndex < numTasks; ++taskIndex) {
 
 		threadData[taskIndex].start = start;
 		threadData[taskIndex].end = end;
 		threadData[taskIndex].numTasks = numTasks;
 		threadData[taskIndex].data = taskData;
 
-		start += taskLenght;
-		end += taskLenght;
+		start += vertsPerTask;
+		end += vertsPerTask;
 	}
 
 	// We patch the last task to end at the last vertex
@@ -203,13 +183,6 @@ MThreadRetVal SingleBlendMeshDeformer::threadEvaluate(void * pParam)
 
 	unsigned int start{ threadData->start };
 	unsigned int end{ threadData->end };
-
-	//Operator [] on maya containers as  a non negligible overhead. By using pointer we can bypass it
-	/*
-	MPoint* currentVertexPosition{ &data->vertexPositions[0] };
-	MVectorArray deltas{ data->deltas };
-	MPoint* resultVertexPosition{ &data->resultPositions[0] };
-	*/
 
 	// Maya containers present some overhead for their operations.
 	// Accessing the memory directly bypasses that overhead

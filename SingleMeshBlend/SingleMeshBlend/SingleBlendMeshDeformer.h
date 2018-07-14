@@ -49,7 +49,7 @@ public:
 	//virtual MStatus preEvaluation(const  MDGContext& context, const MEvaluationNode& evaluationNode) override;
 	virtual MStatus deform(MDataBlock & block, MItGeometry & iterator, const MMatrix & matrix, unsigned int multiIndex) override;
 
-	ThreadData*         createThreadData(int numTasks, TaskData* taskData);
+	ThreadData*         createThreadData(int vertsPerTask, TaskData* taskData);
 	static void         createTasks(void* data, MThreadRootTask *pRoot);
 	static MThreadRetVal threadEvaluate(void* pParam);
 
@@ -69,8 +69,8 @@ public:
 	static MObject blendWeight;
 	static MObject rebind;
 
-	/// The number of thread tasks
-	static MObject numTasks;
+	/// The number of vertex to compute per task
+	static MObject vertsPerTask;
 
 private:
 	bool isInitialized;
