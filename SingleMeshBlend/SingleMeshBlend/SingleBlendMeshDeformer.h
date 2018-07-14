@@ -69,16 +69,16 @@ public:
 	static MObject blendWeight;
 	static MObject rebind;
 
-	/// The number of vertex to compute per task
+	/// The number of vertexes to compute per task
 	static MObject vertsPerTask;
 
 private:
 	bool isInitialized;
 	bool isThreadDataInitialized;
 
-	//The last number of tasks. If it is different to the current numTask we recreate the threadData
+	//The last number of vertsPerTask. If it is different to the current vertsPerTask we recreate the threadData
 	int lastTaskValue;
 
-	TaskData taskData;
+ 	TaskData taskData;
 	ThreadData* threadData;
 };
