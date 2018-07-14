@@ -108,6 +108,8 @@ MStatus SingleBlendMeshDeformer::preEvaluation(const  MDGContext& context, const
 
 MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterator, const MMatrix & matrix, unsigned int multiIndex)
 {
+	CHECK_MSTATUS_AND_RETURN_IT(iterator.allPositions(taskData.vertexPositions));
+
 	bool rebindValue{ block.inputValue(rebind).asBool() };
 
 	if (!isInitialized || rebindValue) {
@@ -121,7 +123,6 @@ MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterat
 		MObject blendMeshValue{ block.inputValue(blendMesh).asMesh() };
 		MFnMesh blendMeshFn{ blendMeshValue };
 
-		CHECK_MSTATUS_AND_RETURN_IT(iterator.allPositions(taskData.vertexPositions));
 		CHECK_MSTATUS_AND_RETURN_IT( cacheBlendMeshVertexPositionsAndDeltas(blendMeshFn, taskData.vertexPositions) );
 		isInitialized = true;
 		isThreadDataInitialized = false;
@@ -149,7 +150,7 @@ MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterat
 
 	MThreadPool::newParallelRegion(createTasks, (void*)threadData);
 
-	iterator.setAllPositions(taskData.resultPositions);
+	iterator.setAllPositions(taskData.vertexPositions);
 
 	return MStatus::kSuccess;
 }
@@ -212,21 +213,21 @@ MThreadRetVal SingleBlendMeshDeformer::threadEvaluate(void * pParam)
 
 	// Maya containers present some overhead for their operations.
 	// Accessing the memory directly bypasses that overhead
-	const double* currentVertexPosition{ &data->vertexPositions[start].x };
-	double* resultVertexPosition{ &data->resultPositions[start].x };
+	double* currentVertexPosition{ &data->vertexPositions[start].x };
 	const double* currentDeltaVector{ &data->deltas[start].x };
 
 	float envelopeValue{ data->envelopeValue };
 	double blendWeightValue{ data->blendWeightValue };
+	double deltaWeight{ blendWeightValue * envelopeValue };
 
 	// The pointers are updated to the next stored value by jumping X doubles ahead depending on the container they are pointing to.
 	// 4 doubles are for MPointArrays and 3 doubles are for MVectorArrays
-	for (unsigned int vertexIndex{ start }; vertexIndex < end; ++vertexIndex, resultVertexPosition += 4, currentVertexPosition += 4, currentDeltaVector += 3 ) {
+	for (unsigned int vertexIndex{ start }; vertexIndex < end; ++vertexIndex, currentVertexPosition += 4, currentDeltaVector += 3 ) {
 		// Calculate the (x, y, z, w) values for the result position and stores them in the correct memory address
-		resultVertexPosition[0] = (currentDeltaVector[0] * blendWeightValue * envelopeValue) + currentVertexPosition[0];
-		resultVertexPosition[1] = (currentDeltaVector[1] * blendWeightValue * envelopeValue) + currentVertexPosition[1];
-		resultVertexPosition[2] = (currentDeltaVector[2] * blendWeightValue * envelopeValue) + currentVertexPosition[2];
-		resultVertexPosition[3] = 1.0;
+		currentVertexPosition[0] = (currentDeltaVector[0] * deltaWeight) + currentVertexPosition[0];
+		currentVertexPosition[1] = (currentDeltaVector[1] * deltaWeight) + currentVertexPosition[1];
+		currentVertexPosition[2] = (currentDeltaVector[2] * deltaWeight) + currentVertexPosition[2];
+		currentVertexPosition[3] = 1.0;
 	}
 
 	return MThreadRetVal();
@@ -243,8 +244,6 @@ MStatus SingleBlendMeshDeformer::cacheBlendMeshVertexPositionsAndDeltas(const MF
 	MPointArray blendVertexPositions{};
 	blendVertexPositions.setLength(vertexCount);
 	CHECK_MSTATUS_AND_RETURN_IT( blendMeshFn.getPoints(blendVertexPositions) );
-
-	taskData.resultPositions.setLength(vertexCount);
 
 	cacheDeltasValues(vertexPositions, blendVertexPositions, vertexCount);
 

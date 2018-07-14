@@ -23,7 +23,6 @@
 //An helper struct that store the data needed by the threads.
 //The data is shared to all threads
 struct TaskData {
-	MPointArray resultPositions;
 	MPointArray vertexPositions;
 	MVectorArray deltas;
 
