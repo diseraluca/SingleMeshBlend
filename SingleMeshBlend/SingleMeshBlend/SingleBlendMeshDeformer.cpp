@@ -108,6 +108,8 @@ MStatus SingleBlendMeshDeformer::preEvaluation(const  MDGContext& context, const
 
 MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterator, const MMatrix & matrix, unsigned int multiIndex)
 {
+	CHECK_MSTATUS_AND_RETURN_IT(iterator.allPositions(taskData.vertexPositions));
+
 	bool rebindValue{ block.inputValue(rebind).asBool() };
 
 	if (!isInitialized || rebindValue) {
@@ -121,15 +123,13 @@ MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterat
 		MObject blendMeshValue{ block.inputValue(blendMesh).asMesh() };
 		MFnMesh blendMeshFn{ blendMeshValue };
 
-		CHECK_MSTATUS_AND_RETURN_IT( cacheBlendMeshVertexPositions(blendMeshFn) );
+		CHECK_MSTATUS_AND_RETURN_IT( cacheBlendMeshVertexPositionsAndDeltas(blendMeshFn, taskData.vertexPositions) );
 		isInitialized = true;
 		isThreadDataInitialized = false;
 	}
 
 	float envelopeValue{ block.inputValue(envelope).asFloat() };
 	double blendWeightValue{ block.inputValue(blendWeight).asDouble() };
-
-	CHECK_MSTATUS_AND_RETURN_IT( iterator.allPositions(taskData.vertexPositions) );
 
 	// Setting the relevant attribute values on taskData so that the threads can access them
 	taskData.envelopeValue = envelopeValue;
@@ -204,37 +204,44 @@ MThreadRetVal SingleBlendMeshDeformer::threadEvaluate(void * pParam)
 	unsigned int start{ threadData->start };
 	unsigned int end{ threadData->end };
 
-	MPointArray& vertexPositions{ data->vertexPositions };
-	MPointArray& blendVertexPositions{ data->blendVertexPositions };
+	//Operator [] on maya containers as  a non negligible overhead. By using pointer we can bypass it
+	MPoint* currentVertexPosition{ &data->vertexPositions[0] };
+	MVectorArray deltas{ data->deltas };
 
 	float envelopeValue{ data->envelopeValue };
 	double blendWeightValue{ data->blendWeightValue };
 
-	//MPointArray operator[] has a non-negligible overhead. 
-	//Accessing the memory directly with pointers bypass that overhead.
-	unsigned int vertexCount{ vertexPositions.length() };
-	MPoint* currentVertexPosition{ &vertexPositions[0] };
-	MPoint* blendVertexPosition{ &blendVertexPositions[0] };
-
-	for (unsigned int vertexIndex{ start }; vertexIndex < end; vertexIndex++) {
-		MVector delta{ (*(blendVertexPosition + vertexIndex) - *(currentVertexPosition + vertexIndex)) * blendWeightValue * envelopeValue };
-		MPoint newPosition{ delta + *(currentVertexPosition + vertexIndex) };
-
-		*(currentVertexPosition + vertexIndex) = newPosition;
+	unsigned int vertexCount{ data->vertexPositions.length() };
+	for (unsigned int vertexIndex{ start }; vertexIndex < end; ++vertexIndex) {
+		currentVertexPosition[vertexIndex] = (deltas[vertexIndex] * blendWeightValue * envelopeValue) + currentVertexPosition[vertexIndex];
 	}
 
 	return MThreadRetVal();
 }
 
-MStatus SingleBlendMeshDeformer::cacheBlendMeshVertexPositions(const MFnMesh & blendMeshFn)
+MStatus SingleBlendMeshDeformer::cacheBlendMeshVertexPositionsAndDeltas(const MFnMesh & blendMeshFn, const MPointArray& vertexPositions)
 {
 	MStatus status{};
 
 	int vertexCount{ blendMeshFn.numVertices(&status) };
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 
-	taskData.blendVertexPositions.setLength(vertexCount);
-	CHECK_MSTATUS_AND_RETURN_IT( blendMeshFn.getPoints(taskData.blendVertexPositions) );
+	// Cache blend vertex Positions
+	MPointArray blendVertexPositions{};
+	blendVertexPositions.setLength(vertexCount);
+	CHECK_MSTATUS_AND_RETURN_IT( blendMeshFn.getPoints(blendVertexPositions) );
+
+	cacheDeltasValues(vertexPositions, blendVertexPositions, vertexCount);
+
+	return MStatus::kSuccess;
+}
+
+MStatus SingleBlendMeshDeformer::cacheDeltasValues(const MPointArray & vertexPositions, const MPointArray & blendVertexPositions, int vertexCount)
+{
+	taskData.deltas.setLength(vertexCount);
+	for (int vertexIndex{ 0 }; vertexIndex < vertexCount; ++vertexIndex) {
+		taskData.deltas[vertexIndex] = blendVertexPositions[vertexIndex] - vertexPositions[vertexIndex];
+	}
 
 	return MStatus::kSuccess;
 }
