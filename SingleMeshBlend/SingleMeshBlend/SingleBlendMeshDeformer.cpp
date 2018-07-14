@@ -30,7 +30,7 @@ SingleBlendMeshDeformer::SingleBlendMeshDeformer()
 	isThreadDataInitialized{ false },
 	lastTaskValue{ 0 },
 	taskData{},
-	threadData{ nullptr },
+	threadData{ nullptr }
 {
 	MThreadPool::init();
 }
@@ -204,16 +204,29 @@ MThreadRetVal SingleBlendMeshDeformer::threadEvaluate(void * pParam)
 	unsigned int end{ threadData->end };
 
 	//Operator [] on maya containers as  a non negligible overhead. By using pointer we can bypass it
+	/*
 	MPoint* currentVertexPosition{ &data->vertexPositions[0] };
 	MVectorArray deltas{ data->deltas };
 	MPoint* resultVertexPosition{ &data->resultPositions[0] };
+	*/
+
+	// Maya containers present some overhead for their operations.
+	// Accessing the memory directly bypasses that overhead
+	const double* currentVertexPosition{ &data->vertexPositions[start].x };
+	double* resultVertexPosition{ &data->resultPositions[start].x };
+	const double* currentDeltaVector{ &data->deltas[start].x };
 
 	float envelopeValue{ data->envelopeValue };
 	double blendWeightValue{ data->blendWeightValue };
 
-	unsigned int vertexCount{ data->vertexPositions.length() };
-	for (unsigned int vertexIndex{ start }; vertexIndex < end; ++vertexIndex) {
-		resultVertexPosition[vertexIndex] = (deltas[vertexIndex] * blendWeightValue * envelopeValue) + currentVertexPosition[vertexIndex];
+	// The pointers are updated to the next stored value by jumping X doubles ahead depending on the container they are pointing to.
+	// 4 doubles are for MPointArrays and 3 doubles are for MVectorArrays
+	for (unsigned int vertexIndex{ start }; vertexIndex < end; ++vertexIndex, resultVertexPosition += 4, currentVertexPosition += 4, currentDeltaVector += 3 ) {
+		// Calculate the (x, y, z, w) values for the result position and stores them in the correct memory address
+		resultVertexPosition[0] = (currentDeltaVector[0] * blendWeightValue * envelopeValue) + currentVertexPosition[0];
+		resultVertexPosition[1] = (currentDeltaVector[1] * blendWeightValue * envelopeValue) + currentVertexPosition[1];
+		resultVertexPosition[2] = (currentDeltaVector[2] * blendWeightValue * envelopeValue) + currentVertexPosition[2];
+		resultVertexPosition[3] = 1.0;
 	}
 
 	return MThreadRetVal();
