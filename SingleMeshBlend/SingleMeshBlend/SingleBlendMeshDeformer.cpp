@@ -17,6 +17,8 @@
 #include <maya/MItGeometry.h>
 #include <maya/MEvaluationNode.h>
 
+#include <immintrin.h>
+
 MString SingleBlendMeshDeformer::typeName{ "SingleBlendMesh" };
 MTypeId SingleBlendMeshDeformer::typeId{ 0x0d12309 };
 
@@ -187,14 +189,22 @@ MThreadRetVal SingleBlendMeshDeformer::threadEvaluate(void * pParam)
 	double blendWeightValue{ data->blendWeightValue };
 	double deltaWeight{ blendWeightValue * envelopeValue };
 
+	__m256d deltaWeightVector = _mm256_set1_pd(deltaWeight);
+
 	// The pointers are updated to the next stored value by jumping X doubles ahead depending on the container they are pointing to.
 	// 4 doubles are for MPointArrays and 3 doubles are for MVectorArrays
 	for (unsigned int vertexIndex{ start }; vertexIndex < end; ++vertexIndex, currentVertexPosition += 4, currentDeltaVector += 3 ) {
-		// Calculate the (x, y, z, w) values for the result position and stores them in the correct memory address
-		currentVertexPosition[0] = (currentDeltaVector[0] * deltaWeight) + currentVertexPosition[0];
-		currentVertexPosition[1] = (currentDeltaVector[1] * deltaWeight) + currentVertexPosition[1];
-		currentVertexPosition[2] = (currentDeltaVector[2] * deltaWeight) + currentVertexPosition[2];
-		currentVertexPosition[3] = 1.0;
+		__m256d vertexPosition = _mm256_load_pd(currentVertexPosition);
+
+		// Deltas contains 3 relevant values. 4 doubles are loaded for AVX vectors so the last value must be masked.
+		// Positive number ( whose highest bit is one ) mask that data to zero.
+		__m256i deltaMask = _mm256_setr_epi32(-1, -1, -1, -1, -1, -1, 1, 1);
+		__m256d deltaVector = _mm256_maskload_pd(currentDeltaVector, deltaMask);
+
+		__m256d partialResult = _mm256_mul_pd(deltaVector, deltaWeightVector);
+		__m256d resultPosition = _mm256_add_pd(partialResult, vertexPosition);
+
+		_mm256_store_pd(currentVertexPosition, resultPosition);
 	}
 
 	return MThreadRetVal();
