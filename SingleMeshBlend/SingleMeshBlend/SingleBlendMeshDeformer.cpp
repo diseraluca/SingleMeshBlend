@@ -30,14 +30,13 @@ SingleBlendMeshDeformer::SingleBlendMeshDeformer()
 	isThreadDataInitialized{ false },
 	lastTaskValue{ 0 },
 	taskData{},
-	threadData{ nullptr }
+	threadData{}
 {
 	MThreadPool::init();
 }
 
 SingleBlendMeshDeformer::~SingleBlendMeshDeformer()
 {
-	delete[] threadData;
 	MThreadPool::release();
 }
 
@@ -92,7 +91,7 @@ MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterat
 
 	bool rebindValue{ block.inputValue(rebind).asBool() };
 
-	if (!isInitialized || rebindValue) {
+	if (!isInitialized | rebindValue) {
 		// If blendMesh is not connected we get out
 		MPlug blendMeshPlug{ thisMObject(), blendMesh };
 		if (!blendMeshPlug.isConnected()) {
@@ -117,30 +116,26 @@ MStatus SingleBlendMeshDeformer::deform(MDataBlock & block, MItGeometry & iterat
 
 	// Initialize thead data
 	int vertsPerTaskValue{ block.inputValue(vertsPerTask).asInt() };
-	if (!isThreadDataInitialized || ( lastTaskValue != vertsPerTaskValue )) {
-		//If it isn't the first time we create the data we delete the previous data
-		if (threadData) {
-			delete[] threadData;
-		}
-
-		threadData = createThreadData(vertsPerTaskValue, &taskData);
+	if (!isThreadDataInitialized | ( lastTaskValue != vertsPerTaskValue )) {
+		createThreadData(vertsPerTaskValue, &taskData);
 		isThreadDataInitialized = true;
 		lastTaskValue = vertsPerTaskValue;
 	}
 
-	MThreadPool::newParallelRegion(createTasks, (void*)threadData);
+	MThreadPool::newParallelRegion(createTasks, (void*)&threadData);
 
 	iterator.setAllPositions(taskData.vertexPositions);
 
 	return MStatus::kSuccess;
 }
 
-ThreadData * SingleBlendMeshDeformer::createThreadData(int vertsPerTask, TaskData * taskData)
+void SingleBlendMeshDeformer::createThreadData(int vertsPerTask, TaskData * taskData)
 {
 	// Calculate the number of task needed and allocate the required memory
 	unsigned int vertexCount{ taskData->vertexPositions.length() };
 	unsigned int numTasks = (vertexCount < vertsPerTask) ? 1 : ( vertexCount / vertsPerTask );
-	ThreadData* threadData = new ThreadData[numTasks];
+	this->threadData.clear();
+	this->threadData.resize(numTasks);
 	
 	unsigned int start{ 0 };
 	unsigned int end{ (unsigned int)vertsPerTask };
@@ -158,18 +153,16 @@ ThreadData * SingleBlendMeshDeformer::createThreadData(int vertsPerTask, TaskDat
 
 	// We patch the last task to end at the last vertex
 	threadData[numTasks - 1].end = vertexCount;
-
-	return threadData;
 }
 
 void SingleBlendMeshDeformer::createTasks(void * data, MThreadRootTask * pRoot)
 {
-	ThreadData* threadData{ static_cast<ThreadData*>(data) };
+	std::vector<ThreadData>* threadData{ static_cast<std::vector<ThreadData>*>(data) };
 
 	if (threadData) {
-		unsigned int numTasks{ threadData->numTasks };
+		unsigned int numTasks{ (*threadData)[0].numTasks };
 		for (unsigned int taskIndex{ 0 }; taskIndex < numTasks; taskIndex++) {
-			MThreadPool::createTask(threadEvaluate, (void*)&threadData[taskIndex], pRoot);
+			MThreadPool::createTask(threadEvaluate, (void*)(&(*threadData)[taskIndex]), pRoot);
 		}
 		MThreadPool::executeAndJoin(pRoot);
 	}
