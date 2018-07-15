@@ -20,6 +20,8 @@
 #include <maya/MFnMesh.h>
 #include <maya/MThreadPool.h>
 
+#include <vector>
+
 //An helper struct that store the data needed by the threads.
 //The data is shared to all threads
 struct TaskData {
@@ -46,10 +48,9 @@ public:
 
 	static  void*   creator();
 	static  MStatus initialize();
-	//virtual MStatus preEvaluation(const  MDGContext& context, const MEvaluationNode& evaluationNode) override;
 	virtual MStatus deform(MDataBlock & block, MItGeometry & iterator, const MMatrix & matrix, unsigned int multiIndex) override;
 
-	ThreadData*         createThreadData(int numTasks, TaskData* taskData);
+	void         createThreadData(int vertsPerTask, TaskData* taskData);
 	static void         createTasks(void* data, MThreadRootTask *pRoot);
 	static MThreadRetVal threadEvaluate(void* pParam);
 
@@ -69,16 +70,16 @@ public:
 	static MObject blendWeight;
 	static MObject rebind;
 
-	/// The number of thread tasks
-	static MObject numTasks;
+	/// The number of vertexes to compute per task
+	static MObject vertsPerTask;
 
 private:
 	bool isInitialized;
 	bool isThreadDataInitialized;
 
-	//The last number of tasks. If it is different to the current numTask we recreate the threadData
+	//The last number of vertsPerTask. If it is different to the current vertsPerTask we recreate the threadData
 	int lastTaskValue;
 
-	TaskData taskData;
-	ThreadData* threadData;
+ 	TaskData taskData;
+	std::vector<ThreadData> threadData;
 };
